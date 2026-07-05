@@ -21,11 +21,7 @@ export class CatSerializer {
       lastName: cat.lastName,
       description: cat.description,
       image: cat.image,
-      mice: cat.mice ? MouseSerializer.serializeMany(cat.mice) : [],
+      mice: cat.mice ? cat.mice.map((mouse) => MouseSerializer.serialize(mouse)) : [],
     };
-  }
-
-  static serializeMany(cats: CatModel[]): ICatSerialized[] {
-    return cats.map((cat) => CatSerializer.serialize(cat));
   }
 }

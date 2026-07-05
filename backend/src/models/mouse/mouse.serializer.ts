@@ -12,8 +12,4 @@ export class MouseSerializer {
       name: mouse.name,
     };
   }
-
-  static serializeMany(mice: MouseModel[]): IMouseSerialized[] {
-    return mice.map((mouse) => MouseSerializer.serialize(mouse));
-  }
 }

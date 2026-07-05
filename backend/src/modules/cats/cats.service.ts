@@ -55,7 +55,7 @@ export class CatsService {
     });
 
     return buildPaginatedResponse(
-      CatSerializer.serializeMany(rows),
+      rows.map((cat) => CatSerializer.serialize(cat)),
       count,
       page,
       limit,
