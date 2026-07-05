@@ -6,7 +6,8 @@ React frontend for the Cats Management exercise.
 
 - React 18+
 - TypeScript
-- Constate (state management)
+- TanStack Query (server state)
+- React Hook Form (forms)
 - Tailwind CSS
 - React Router
 

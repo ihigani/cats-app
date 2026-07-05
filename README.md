@@ -5,7 +5,7 @@ Full-stack Cats Management application built for the Entitle developer exercise.
 ## Structure
 
 - `backend/` – NestJS API (Fastify, PostgreSQL, Sequelize)
-- `frontend/` – React app (Constate, Tailwind)
+- `frontend/` – React app (React Query, React Hook Form, Tailwind)
 
 ## Quick Start
 

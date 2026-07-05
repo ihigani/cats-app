@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { useCats } from '../state/cats.state';
+import {
+  useCatQuery,
+  useCreateCatMutation,
+  useDeleteCatMutation,
+  useUpdateCatMutation,
+} from '../hooks/cats.queries';
 import type { ICatFormData } from '../types/cat.types';
 
 const EMPTY_FORM: ICatFormData = {
@@ -12,81 +18,84 @@ const EMPTY_FORM: ICatFormData = {
   mice: [{ name: '' }],
 };
 
+const inputClassName =
+  'mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2';
+
 export const CatFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
   const catId = id ? Number(id) : undefined;
-  const { selectedCat, isLoading, error, loadCat, saveCat, removeCat, clearSelectedCat } =
-    useCats();
-  const [formData, setFormData] = useState<ICatFormData>(EMPTY_FORM);
+
+  const {
+    data: cat,
+    isLoading: isLoadingCat,
+    error: loadError,
+  } = useCatQuery(isEditing ? catId : undefined);
+
+  const createCatMutation = useCreateCatMutation();
+  const updateCatMutation = useUpdateCatMutation();
+  const deleteCatMutation = useDeleteCatMutation();
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ICatFormData>({
+    defaultValues: EMPTY_FORM,
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'mice',
+  });
 
   useEffect(() => {
-    if (!isEditing || !catId || Number.isNaN(catId)) return;
+    if (!cat) return;
 
-    const load = async () => {
-      const cat = await loadCat(catId);
-      if (!cat) return;
+    reset({
+      firstName: cat.firstName,
+      lastName: cat.lastName,
+      description: cat.description,
+      image: cat.image,
+      mice: cat.mice.length
+        ? cat.mice.map((mouse) => ({ name: mouse.name }))
+        : [{ name: '' }],
+    });
+  }, [cat, reset]);
 
-      setFormData({
-        firstName: cat.firstName,
-        lastName: cat.lastName,
-        description: cat.description,
-        image: cat.image,
-        mice: cat.mice.length
-          ? cat.mice.map((mouse) => ({ name: mouse.name }))
-          : [{ name: '' }],
-      });
-    };
+  const isSaving =
+    isSubmitting || createCatMutation.isPending || updateCatMutation.isPending;
+  const isDeleting = deleteCatMutation.isPending;
 
-    void load();
+  const mutationError =
+    createCatMutation.error ??
+    updateCatMutation.error ??
+    deleteCatMutation.error;
 
-    return () => {
-      clearSelectedCat();
-    };
-  }, [catId, clearSelectedCat, isEditing, loadCat]);
+  const errorMessage =
+    loadError instanceof Error
+      ? loadError.message
+      : mutationError instanceof Error
+        ? mutationError.message
+        : null;
 
-  const updateField = <K extends keyof ICatFormData>(
-    field: K,
-    value: ICatFormData[K],
-  ) => {
-    setFormData((current) => ({ ...current, [field]: value }));
-  };
-
-  const updateMouseName = (index: number, name: string) => {
-    setFormData((current) => ({
-      ...current,
-      mice: current.mice.map((mouse, mouseIndex) =>
-        mouseIndex === index ? { name } : mouse,
-      ),
-    }));
-  };
-
-  const addMouseField = () => {
-    setFormData((current) => ({
-      ...current,
-      mice: [...current.mice, { name: '' }],
-    }));
-  };
-
-  const removeMouseField = (index: number) => {
-    setFormData((current) => ({
-      ...current,
-      mice: current.mice.filter((_, mouseIndex) => mouseIndex !== index),
-    }));
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const onSubmit = handleSubmit(async (formData) => {
     const payload: ICatFormData = {
       ...formData,
       mice: formData.mice.filter((mouse) => mouse.name.trim()),
     };
 
-    const saved = await saveCat(payload, catId);
-    if (saved) navigate('/');
-  };
+    if (isEditing && catId) {
+      await updateCatMutation.mutateAsync({ id: catId, data: payload });
+    } else {
+      await createCatMutation.mutateAsync(payload);
+    }
+
+    navigate('/');
+  });
 
   const handleDelete = async () => {
     if (!catId) return;
@@ -94,50 +103,58 @@ export const CatFormPage = () => {
     const confirmed = window.confirm('Delete this cat permanently?');
     if (!confirmed) return;
 
-    const deleted = await removeCat(catId);
-    if (deleted) navigate('/');
+    await deleteCatMutation.mutateAsync(catId);
+    navigate('/');
   };
 
   return (
     <Layout title={isEditing ? 'Edit Cat' : 'Add Cat'}>
-      {error ? (
+      {errorMessage ? (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          {errorMessage}
         </p>
       ) : null}
 
-      {isLoading && isEditing && !selectedCat ? (
+      {isLoadingCat && isEditing && !cat ? (
         <p className="text-slate-600">Loading cat...</p>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-amber-100 bg-white p-6 shadow-sm">
+        <form
+          onSubmit={onSubmit}
+          className="space-y-5 rounded-2xl border border-amber-100 bg-white p-6 shadow-sm"
+        >
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-slate-700">
               First name
               <input
-                required
-                value={formData.firstName}
-                onChange={(event) => updateField('firstName', event.target.value)}
-                className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+                {...register('firstName', { required: 'First name is required' })}
+                className={inputClassName}
               />
+              {errors.firstName ? (
+                <span className="mt-1 block text-sm text-red-600">
+                  {errors.firstName.message}
+                </span>
+              ) : null}
             </label>
             <label className="block text-sm font-medium text-slate-700">
               Last name
               <input
-                required
-                value={formData.lastName}
-                onChange={(event) => updateField('lastName', event.target.value)}
-                className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+                {...register('lastName', { required: 'Last name is required' })}
+                className={inputClassName}
               />
+              {errors.lastName ? (
+                <span className="mt-1 block text-sm text-red-600">
+                  {errors.lastName.message}
+                </span>
+              ) : null}
             </label>
           </div>
 
           <label className="block text-sm font-medium text-slate-700">
             Description
             <textarea
-              value={formData.description}
-              onChange={(event) => updateField('description', event.target.value)}
+              {...register('description')}
               rows={4}
-              className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+              className={inputClassName}
             />
           </label>
 
@@ -145,9 +162,8 @@ export const CatFormPage = () => {
             Image URL
             <input
               type="url"
-              value={formData.image}
-              onChange={(event) => updateField('image', event.target.value)}
-              className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+              {...register('image')}
+              className={inputClassName}
               placeholder="https://..."
             />
           </label>
@@ -157,24 +173,23 @@ export const CatFormPage = () => {
               <p className="text-sm font-medium text-slate-700">Mice</p>
               <button
                 type="button"
-                onClick={addMouseField}
+                onClick={() => append({ name: '' })}
                 className="rounded-lg border border-amber-300 px-3 py-1 text-sm font-semibold text-amber-800 transition hover:bg-amber-50"
               >
                 Add Mouse
               </button>
             </div>
             <div className="space-y-3">
-              {formData.mice.map((mouse, index) => (
-                <div key={`mouse-${index}`} className="flex gap-3">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex gap-3">
                   <input
-                    value={mouse.name}
-                    onChange={(event) => updateMouseName(index, event.target.value)}
+                    {...register(`mice.${index}.name` as const)}
                     className="flex-1 rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
                     placeholder="Mouse name"
                   />
                   <button
                     type="button"
-                    onClick={() => removeMouseField(index)}
+                    onClick={() => remove(index)}
                     className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                   >
                     Remove
@@ -187,7 +202,7 @@ export const CatFormPage = () => {
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSaving || isDeleting}
               className="rounded-lg bg-amber-500 px-5 py-2 font-semibold text-white transition hover:bg-amber-600 disabled:opacity-60"
             >
               {isEditing ? 'Update' : 'Save'}
@@ -196,7 +211,7 @@ export const CatFormPage = () => {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={isLoading}
+                disabled={isSaving || isDeleting}
                 className="rounded-lg border border-red-200 px-5 py-2 font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
               >
                 Delete Cat

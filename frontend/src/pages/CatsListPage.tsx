@@ -1,58 +1,79 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { CatCard } from '../components/CatCard';
 import { Layout } from '../components/Layout';
 import { Pagination } from '../components/Pagination';
-import { useCats } from '../state/cats.state';
+import { useCatsQuery, useDeleteCatMutation } from '../hooks/cats.queries';
+import type { ICatsFilters } from '../types/cat.types';
+
+const DEFAULT_FILTERS: ICatsFilters = {
+  catName: '',
+  mouseName: '',
+  page: 1,
+  limit: 6,
+};
+
+interface ISearchFormData {
+  catName: string;
+  mouseName: string;
+}
+
+const searchInputClassName =
+  'mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2';
 
 export const CatsListPage = () => {
   const navigate = useNavigate();
-  const { catsResult, filters, isLoading, error, loadCats, removeCat } =
-    useCats();
-  const [catNameInput, setCatNameInput] = useState(filters.catName);
-  const [mouseNameInput, setMouseNameInput] = useState(filters.mouseName);
+  const [filters, setFilters] = useState<ICatsFilters>(DEFAULT_FILTERS);
 
-  useEffect(() => {
-    void loadCats();
-  }, []);
+  const { data: catsResult, isLoading, error } = useCatsQuery(filters);
+  const deleteCatMutation = useDeleteCatMutation();
 
-  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    void loadCats({
-      catName: catNameInput.trim(),
-      mouseName: mouseNameInput.trim(),
+  const { register, handleSubmit } = useForm<ISearchFormData>({
+    defaultValues: {
+      catName: DEFAULT_FILTERS.catName,
+      mouseName: DEFAULT_FILTERS.mouseName,
+    },
+  });
+
+  const onSearch = handleSubmit((values) => {
+    setFilters((current) => ({
+      ...current,
+      catName: values.catName.trim(),
+      mouseName: values.mouseName.trim(),
       page: 1,
-    });
-  };
+    }));
+  });
 
   const handleDelete = async (id: number) => {
     const confirmed = window.confirm('Delete this cat?');
     if (!confirmed) return;
-    await removeCat(id);
+
+    await deleteCatMutation.mutateAsync(id);
   };
+
+  const errorMessage = error instanceof Error ? error.message : null;
 
   return (
     <Layout title="Cats List">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <form
-          onSubmit={handleSearch}
+          onSubmit={onSearch}
           className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
         >
           <label className="block text-sm font-medium text-slate-700">
             Filter by cat name
             <input
-              value={catNameInput}
-              onChange={(event) => setCatNameInput(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+              {...register('catName')}
+              className={searchInputClassName}
               placeholder="e.g. Luna"
             />
           </label>
           <label className="block text-sm font-medium text-slate-700">
             Filter by mouse name
             <input
-              value={mouseNameInput}
-              onChange={(event) => setMouseNameInput(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-amber-200 px-3 py-2 outline-none ring-amber-400 focus:ring-2"
+              {...register('mouseName')}
+              className={searchInputClassName}
               placeholder="e.g. Jerry"
             />
           </label>
@@ -71,9 +92,9 @@ export const CatsListPage = () => {
         </Link>
       </div>
 
-      {error ? (
+      {errorMessage ? (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+          {errorMessage}
         </p>
       ) : null}
 
@@ -101,7 +122,9 @@ export const CatsListPage = () => {
           <Pagination
             page={catsResult.page}
             totalPages={catsResult.totalPages}
-            onPageChange={(page) => void loadCats({ page })}
+            onPageChange={(page) =>
+              setFilters((current) => ({ ...current, page }))
+            }
           />
         </div>
       ) : null}
