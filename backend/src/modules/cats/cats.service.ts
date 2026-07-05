@@ -5,7 +5,7 @@ import { buildPaginatedResponse } from 'src/common/serializers/responses/paginat
 import { CatModel } from 'src/models/cat/cat.model';
 import { CatSerializer } from 'src/models/cat/cat.serializer';
 import { MouseModel } from 'src/models/mouse/mouse.model';
-import { CreateCatDto, UpdateCatDto } from 'src/modules/cats/cats.dto';
+import { CreateCatDto, UpdateCatDto } from 'src/modules/cats/cats.schema';
 
 interface IFindAllParams {
   page: number;

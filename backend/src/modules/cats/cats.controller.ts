@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { PaginationQuery } from 'src/common/schemas/pagination/pagination.query';
-import { CreateCatDto, UpdateCatDto } from 'src/modules/cats/cats.dto';
+import { CreateCatDto, UpdateCatDto } from 'src/modules/cats/cats.schema';
 import { CatsService } from 'src/modules/cats/cats.service';
 
 @Controller('cats')
